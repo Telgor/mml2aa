@@ -5,10 +5,11 @@ class Lexer(object):
     def __init__(self):
         # define a subset of the MML grammar that we want to support:
         dict_re_elements = {
-            'note': '(?P<extend_note>&)?(?P<Note>[cdefgab])(?P<accidental>[-+#])?(?P<note_measure_part>\d+)?(?P<note_dot>\.)?',
+            'note': '(?P<extend_note>&)?(?P<Note>[cdefgab])(?P<accidental>[-+#])?' +
+                    '(?P<note_note_value>\d+)?(?P<note_dot>\.)?',
             'num_note': '(?P<extend_num>&)?(?P<N>n)(?P<Note_num>\d+)(?P<num_note_dot>\.)?',
-            'rest': '(?P<R>[r])(?P<rest_measure_part>\d+)?(?P<rest_dot>\.)?',
-            'default_length': '(?P<L>l)(?P<default_length>\d+)',
+            'rest': '(?P<R>[r])(?P<rest_note_value>\d+)?(?P<rest_dot>\.)?',
+            'default_note_value': '(?P<L>l)(?P<default_note_value>\d+)',
             'volume': '(?P<V>[v])(?P<volume>\d+)',
             'tempo': '(?P<T>[t])(?P<tempo>\d+)',
             'octave': '(?P<O>[o])(?P<octave>\d+)',
@@ -22,7 +23,7 @@ class Lexer(object):
         ret = []
         for (i, track) in enumerate(tracks):
             print 'Track #' + str(i)
-            ret += self.process_tracks(track)
+            ret += [self.process_tracks(track)]
         return ret
 
     def process_tracks(self, track):
