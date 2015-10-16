@@ -10,14 +10,21 @@ def argmin(iterable):
 
 
 class TrackerState(object):
+    """
+    Holds all the variables that can be change through MML.
+    Tempo in 3MLE is shared between all tracks, but it is per-track in AA.
+    We use the 3MLE behavior, and will update tempo in all channels manually.
+    """
+
     def __init__(self, num_tracks):
         self.num_tracks = num_tracks
         self.positions = [0] * num_tracks
         self.measures = [0] * num_tracks
         self.multipliers = [1.] * num_tracks
         self.default_note_values = [4] * num_tracks
+        self.octaves = [4] * num_tracks
         self.time = [0] * num_tracks
-        self.cur_tempo = 120
+        self.tempo = 120
         self.volumes = [100] * num_tracks
         self.active_tracks = num_tracks
 
@@ -27,18 +34,19 @@ class AAConverter(object):
         self.tokens = tokens
         self.num_tracks = len(tokens)
         self.event_counts = [len(i) for i in self.tokens]
+        self.state = TrackerState(self.num_tracks)
+        self.new_tokens = [[]] * self.num_tracks
 
     def process(self):
         ret_str = ''
-        state = TrackerState(self.num_tracks)
 
         # add start and end times to each event
         while True:
-            i = self.get_next_event_and_update_state(state)
+            i = self.get_next_event_and_update_state(self.state)
             if not i:
                 break
             print i
-            print state.measures
+            print self.state.measures
 
         return ret_str
 
@@ -54,8 +62,10 @@ class AAConverter(object):
             return None
 
         event = self.tokens[i][state.positions[i]]
-        state.positions[i] += 1
-        state.measures[i] += self.get_event_note_value(event, state.default_note_values[i], state.multipliers[i])
+        if self.is_control_event(event):
+            self.process_control_event(event, i)
+        else:
+            self.process_note_event(event, i)
         return event
 
     @staticmethod
@@ -72,3 +82,39 @@ class AAConverter(object):
             multiplier = 1.5 if 'num_note_dot' in event else default_note_multiplier
             note_value = default_note_value
         return multiplier / int(note_value) if note_value else 0
+
+    @staticmethod
+    def is_control_event(event):
+        return not ('Note' in event or 'R' in event or 'N' in event)
+
+    def process_control_event(self, event, i):
+        state = self.state
+        assert self.is_control_event(event)
+        if 'O' in event:
+            state.octaves[i] = event['octave']
+        elif 'octave_shift' in event:
+            change = 1 if event['octave_shift'] == '>' else -1
+            state.octaves[i] += change
+        elif 'T' in event:
+            state.tempo = event['tempo']
+        elif 'V' in event:
+            new_volume = self.convert_volume(int(event['volume']))
+            state.volumes[i] = new_volume
+            event['volume'] = str(new_volume)
+        elif 'L' in event:
+            state.default_note_values[i] = event['default_note_value']
+
+        state.positions[i] += 1
+
+    def process_note_event(self, event, i):
+        state = self.state
+        assert not self.is_control_event(event)
+        if 'N' in event:
+            octave = state.octaves[i]
+
+        state.positions[i] += 1
+        state.measures[i] += self.get_event_note_value(event, state.default_note_values[i], state.multipliers[i])
+
+    @staticmethod
+    def convert_volume(volume):
+        return round(volume * (127. / 15.))
