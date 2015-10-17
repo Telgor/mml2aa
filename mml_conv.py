@@ -1,3 +1,8 @@
+"""
+There is a useful reddit post describing the differences here:
+https://www.reddit.com/r/archebards/comments/3bwgj7/howto_fix_archeagemml_desyncs/
+"""
+
 import sys
 
 
@@ -35,7 +40,7 @@ class AAConverter(object):
         self.num_tracks = len(tokens)
         self.event_counts = [len(i) for i in self.tokens]
         self.state = TrackerState(self.num_tracks)
-        self.new_tokens = [[]] * self.num_tracks
+        self.new_tokens = [[] for _i in xrange(self.num_tracks)]
 
     def process(self):
         ret_str = ''
@@ -104,6 +109,7 @@ class AAConverter(object):
         elif 'L' in event:
             state.default_note_values[i] = event['default_note_value']
 
+        self.new_tokens[i] += [event]
         state.positions[i] += 1
 
     def process_note_event(self, event, i):
@@ -112,9 +118,16 @@ class AAConverter(object):
         if 'N' in event:
             octave = state.octaves[i]
 
+        self.new_tokens[i] += [event]
         state.positions[i] += 1
         state.measures[i] += self.get_event_note_value(event, state.default_note_values[i], state.multipliers[i])
 
     @staticmethod
     def convert_volume(volume):
+        """
+        the volume in 3MLE is 0 to 15, but 0 to 127 in AA as in:
+        https://www.reddit.com/r/archebards/comments/3bwgj7/howto_fix_archeagemml_desyncs/cu5gizt
+        :param volume:
+        :return:
+        """
         return round(volume * (127. / 15.))
