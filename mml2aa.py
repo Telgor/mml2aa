@@ -9,7 +9,7 @@ def get_note_time(tempo, measure_part):
 # TODO: allow multiple lines.
 # Test string for debugging.
 # Eventually this should change to reading from standard input.
-strMML = 'r1.rv9l8<arbr4.>crdr4.cr<br4.arg+r4.arbr4.>crdr4.cr<br4.ar>cr4.crcr4.c,eeeeeeeeeeeeee'
+strMML = 'r1.rv9l8<arbr4.>crdr4.cr<br4.a(rg+)r4.arbr4.>crdr4.cr<br4.ar>cr4.crcr4.c,eeeeeeeeeeeeee'
 # strMML = raw_input()
 
 tracks = strMML.split(",")
@@ -25,5 +25,6 @@ lexer = mml_lexer.Lexer()
 tokens = lexer.process(tracks)
 print tokens
 
-conv = mml_conv.AAConverter(tokens)
-conv.process()
+converter = mml_conv.AAConverter(tokens)
+converter.process()
+print converter

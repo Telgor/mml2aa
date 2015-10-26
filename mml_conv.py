@@ -56,10 +56,11 @@ class AAConverter(object):
         return ret_str
 
     def get_next_event_and_update_state(self, state):
+        i = 0
         while state.active_tracks > 0:
             i = argmin(state.measures)
             if state.positions[i] >= self.event_counts[i]:
-                state.positions[i] = sys.maxsize
+                state.measures[i] = sys.maxsize
                 state.active_tracks -= 1
             else:
                 break
@@ -100,13 +101,22 @@ class AAConverter(object):
         elif 'octave_shift' in event:
             change = 1 if event['octave_shift'] == '>' else -1
             state.octaves[i] += change
+        elif 'volume_shift' in event:
+            change = 1 if event['volume_shift'] == ')' else -1
+            state.volumes[i] += change
+            # convert to volume event
+            event['V'] = 'v'
+            event['volume'] = str(state.volumes[i])
+            event['volume_127'] = self.convert_volume(state.volumes[i])
         elif 'T' in event:
             state.tempo = event['tempo']
         elif 'V' in event:
-            new_volume = self.convert_volume(int(event['volume']))
+            new_volume = int(event['volume'])
             state.volumes[i] = new_volume
             event['volume'] = str(new_volume)
+            event['volume_127'] = self.convert_volume(int(event['volume']))
         elif 'L' in event:
+            state.multipliers[i] = 1.5 if 'default_note_dot' in event else 1.
             state.default_note_values[i] = event['default_note_value']
 
         self.new_tokens[i] += [event]
@@ -115,6 +125,7 @@ class AAConverter(object):
     def process_note_event(self, event, i):
         state = self.state
         assert not self.is_control_event(event)
+        # TODO: create multiple eventsfor numbered notes and dotted rests.
         if 'N' in event:
             octave = state.octaves[i]
 
@@ -130,4 +141,40 @@ class AAConverter(object):
         :param volume:
         :return:
         """
-        return round(volume * (127. / 15.))
+        return int(round(volume * (127. / 15.)))
+
+    def __str__(self):
+        str_ret = ''
+        for track in self.new_tokens:
+            for event in track:
+                str_ret += self.event_to_string(event)
+            str_ret += ','
+        return str_ret
+
+    @staticmethod
+    def event_to_string(event):
+        str_ret = ''
+        if 'Note' in event:
+            if 'extend_note' in event:
+                str_ret += '&'
+            str_ret += event['Note']
+            if 'accidental' in event:
+                str_ret += event['accidental']
+            if 'note_note_value' in event:
+                str_ret += event['note_note_value']
+            return str_ret
+        elif 'R' in event:
+            str_ret = event['R']
+            if 'rest_note_value' in event:
+                str_ret += event['rest_note_value']
+            return str_ret
+        elif 'L' in event:
+            return event['L'] + event['default_note_value']
+        elif 'V' in event:
+            return event['V'] + str(event['volume_127'])
+        elif 'T' in event:
+            return event['T'] + event['tempo']
+        elif 'O' in event:
+            return event['O'] + event['octave']
+        elif 'octave_shift' in event:
+            return event['octave_shift']

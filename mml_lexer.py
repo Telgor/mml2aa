@@ -9,8 +9,9 @@ class Lexer(object):
                     '(?P<note_note_value>\d+)?(?P<note_dot>\.)?',
             'num_note': '(?P<extend_num>&)?(?P<N>n)(?P<Note_num>\d+)(?P<num_note_dot>\.)?',
             'rest': '(?P<R>[r])(?P<rest_note_value>\d+)?(?P<rest_dot>\.)?',
-            'default_note_value': '(?P<L>l)(?P<default_note_value>\d+)',
+            'default_note_value': '(?P<L>l)(?P<default_note_value>\d+)(?P<default_note_dot>\.)?',
             'volume': '(?P<V>[v])(?P<volume>\d+)',
+            'volume_shift': '(?P<volume_shift>[\(\)])',
             'tempo': '(?P<T>[t])(?P<tempo>\d+)',
             'octave': '(?P<O>[o])(?P<octave>\d+)',
             'octave_shift': '(?P<octave_shift>[<>])'
