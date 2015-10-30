@@ -125,11 +125,20 @@ class AAConverter(object):
     def process_note_event(self, event, i):
         state = self.state
         assert not self.is_control_event(event)
-        # TODO: create multiple eventsfor numbered notes and dotted rests.
+        # TODO: create multiple events for numbered notes and dotted rests.
         if 'N' in event:
-            octave = state.octaves[i]
+            current_octave = state.octaves[i]
+            note_num = int(event['Note_num'])
+            new_event = self.numbered_note_to_named_note(event)
+            # before adding the note, insert an octave change
+            note_octave = note_num // 12
+            if current_octave != note_octave:
+                self.new_tokens[i] += [{'O': 'o', 'octave': str(note_octave)},
+                                       new_event,
+                                       {'O': 'o', 'octave': str(current_octave)}]
+        else:
+            self.new_tokens[i] += [event]
 
-        self.new_tokens[i] += [event]
         state.positions[i] += 1
         state.measures[i] += self.get_event_note_value(event, state.default_note_values[i], state.multipliers[i])
 
@@ -162,6 +171,8 @@ class AAConverter(object):
                 str_ret += event['accidental']
             if 'note_note_value' in event:
                 str_ret += event['note_note_value']
+            if 'note_dot' in event:
+                str_ret += event['note_dot']
             return str_ret
         elif 'R' in event:
             str_ret = event['R']
@@ -178,3 +189,26 @@ class AAConverter(object):
             return event['O'] + event['octave']
         elif 'octave_shift' in event:
             return event['octave_shift']
+
+    @staticmethod
+    def note_name(note_num):
+        note_num_modulus = note_num % 12
+        note_string = ['c', 'c', 'd', 'd', 'e', 'f', 'f', 'g', 'g', 'a', 'a', 'b'][note_num_modulus]
+        note_num_sharp = note_num_modulus in [1, 3, 6, 8, 10]
+        return note_string, '#' if note_num_sharp else ''
+
+    @classmethod
+    def numbered_note_to_named_note(cls, event):
+        assert 'Note_num' in event
+        note_num = int(event['Note_num'])
+        note_string, note_accidental = cls.note_name(note_num)
+        # create a new event
+        new_event = {'Note': note_string}
+        if note_accidental:
+            new_event['accidental'] = note_accidental
+            # use default note_note_value
+        if 'extended_num' in event:
+            new_event['extend_note'] = event['extend_num']
+        if 'num_note_dot' in event:
+            new_event['note_dot'] = event['num_note_dot']
+        return new_event
