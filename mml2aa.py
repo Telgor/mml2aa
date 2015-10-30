@@ -12,9 +12,10 @@ def get_note_time(tempo, measure_part):
 # Eventually this should change to reading from standard input.
 # strMML = 'r1.rv9l8<an78.rbr4.>crdr4.cr<br4.a(rg+)r4.arbr4.>crdr4.cr<br4.ar>cr4.crcr4.cr.,eeeeeeeeeeeeee'
 list_strMML = []
-re_whitespace = re.compile(r'\s+')
+# remove all whitespaces, the "MML@" header and the trailing ";"
+re_to_remove = re.compile(r'\s+|MML@|;')
 for line in fileinput.input():
-    list_strMML.append(re.sub(re_whitespace, '', line))
+    list_strMML.append(re.sub(re_to_remove, '', line))
 strMML = ''.join(list_strMML)
 
 tracks = strMML.split(",")

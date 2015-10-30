@@ -104,7 +104,10 @@ class AAConverter(object):
         state = self.state
         assert self.is_control_event(event)
         if 'O' in event:
-            state.octaves[i] = event['octave']
+            # archeage plays one octave lower
+            octave = int(event['octave']) + 1
+            state.octaves[i] = octave
+            event['octave'] = str(octave)
         elif 'octave_shift' in event:
             change = 1 if event['octave_shift'] == '>' else -1
             state.octaves[i] += change
@@ -134,7 +137,7 @@ class AAConverter(object):
         assert not self.is_control_event(event)
         # TODO: create multiple events for numbered notes and dotted rests.
         if 'N' in event:
-            current_octave = state.octaves[i]
+            current_octave = int(state.octaves[i])
             note_num = int(event['Note_num'])
             new_event = self.numbered_note_to_named_note(event)
             # before adding the note, insert an octave change
@@ -143,6 +146,9 @@ class AAConverter(object):
                 self.new_tokens[i] += [{'O': 'o', 'octave': str(note_octave)},
                                        new_event,
                                        {'O': 'o', 'octave': str(current_octave)}]
+            else:
+                self.new_tokens[i] += [new_event]
+
         elif 'R' in event:
             if 'rest_dot' in event:
                 new_primary = {'R': 'r'}
@@ -204,7 +210,10 @@ class AAConverter(object):
                 str_ret += event['rest_note_value']
             return str_ret
         elif 'L' in event:
-            return event['L'] + event['default_note_value']
+            str_ret = event['L'] + event['default_note_value']
+            if 'default_note_dot' in event:
+                str_ret += event['default_note_dot']
+            return str_ret
         elif 'V' in event:
             return event['V'] + str(event['volume_127'])
         elif 'T' in event:
