@@ -27,10 +27,10 @@ class TrackerState(object):
         self.measures = [0] * num_tracks
         self.multipliers = [1.] * num_tracks
         self.default_note_values = [4] * num_tracks
-        self.octaves = [4] * num_tracks
+        self.octaves = [5] * num_tracks
         self.time = [0] * num_tracks
         self.tempo = 120
-        self.volumes = [100] * num_tracks
+        self.volumes = [10] * num_tracks
         self.active_tracks = num_tracks
 
 
@@ -40,7 +40,14 @@ class AAConverter(object):
         self.num_tracks = len(tokens)
         self.event_counts = [len(i) for i in self.tokens]
         self.state = TrackerState(self.num_tracks)
-        self.new_tokens = [[] for _i in xrange(self.num_tracks)]
+        self.track_start = [{'O': 'o', 'octave': '5'},
+                            {'V': 'v', 'volume_127': '85'},
+                            {'L': 'l', 'default_note_value': '4'},
+                            # disabled because tempo should be sorted per channel beforehand.
+                            # if future versions solve cross-tracks tempo changes, this could be enabled.
+                            # {'T': 't', 'tempo': '120'}
+                            ]
+        self.new_tokens = [[_j.copy() for _j in self.track_start] for _i in xrange(self.num_tracks)]
 
     def process(self):
         ret_str = ''
@@ -131,11 +138,27 @@ class AAConverter(object):
             note_num = int(event['Note_num'])
             new_event = self.numbered_note_to_named_note(event)
             # before adding the note, insert an octave change
-            note_octave = note_num // 12
+            note_octave = note_num // 12 + 1
             if current_octave != note_octave:
                 self.new_tokens[i] += [{'O': 'o', 'octave': str(note_octave)},
                                        new_event,
                                        {'O': 'o', 'octave': str(current_octave)}]
+        elif 'R' in event:
+            if 'rest_dot' in event:
+                new_primary = {'R': 'r'}
+                new_secondary = {'R': 'r'}
+                if 'rest_note_value' in event:
+                    primary_value = event['rest_note_value']
+                    new_primary['rest_note_value'] = primary_value
+                else:
+                    primary_value = state.default_note_values[i]
+
+                secondary_value = str(int(primary_value) * 2)
+                new_secondary['rest_note_value'] = secondary_value
+                self.new_tokens[i] += [new_primary]
+                self.new_tokens[i] += [new_secondary]
+            else:
+                self.new_tokens[i] += [event]
         else:
             self.new_tokens[i] += [event]
 
@@ -153,12 +176,13 @@ class AAConverter(object):
         return int(round(volume * (127. / 15.)))
 
     def __str__(self):
-        str_ret = ''
+        list_track_strings = []
         for track in self.new_tokens:
+            track_string = ''
             for event in track:
-                str_ret += self.event_to_string(event)
-            str_ret += ','
-        return str_ret
+                track_string += self.event_to_string(event)
+            list_track_strings += [track_string]
+        return ','.join(list_track_strings)
 
     @staticmethod
     def event_to_string(event):
@@ -189,6 +213,8 @@ class AAConverter(object):
             return event['O'] + event['octave']
         elif 'octave_shift' in event:
             return event['octave_shift']
+        elif 'white_space' in event:
+            return ''
 
     @staticmethod
     def note_name(note_num):

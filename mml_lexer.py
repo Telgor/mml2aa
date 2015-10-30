@@ -4,6 +4,7 @@ import re
 class Lexer(object):
     def __init__(self):
         # define a subset of the MML grammar that we want to support:
+        # the convention here is Uppercase for mandatory fields, and lowercase of optional fields.
         dict_re_elements = {
             'note': '(?P<extend_note>&)?(?P<Note>[cdefgab])(?P<accidental>[-+#])?' +
                     '(?P<note_note_value>\d+)?(?P<note_dot>\.)?',
@@ -14,7 +15,8 @@ class Lexer(object):
             'volume_shift': '(?P<volume_shift>[\(\)])',
             'tempo': '(?P<T>[t])(?P<tempo>\d+)',
             'octave': '(?P<O>[o])(?P<octave>\d+)',
-            'octave_shift': '(?P<octave_shift>[<>])'
+            'octave_shift': '(?P<octave_shift>[<>])',
+            'white_space': '(?P<white_space>\s)'
         }
 
         str_re_element_grammar = '(' + ')|('.join(dict_re_elements.values()) + ')'
