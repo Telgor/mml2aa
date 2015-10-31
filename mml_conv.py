@@ -30,7 +30,7 @@ class TrackerState(object):
         self.octaves = [5] * num_tracks
         self.time = [0] * num_tracks
         self.tempo = 120
-        self.volumes = [10] * num_tracks
+        self.volumes = [8] * num_tracks
         self.active_tracks = num_tracks
 
 
@@ -41,7 +41,7 @@ class AAConverter(object):
         self.event_counts = [len(i) for i in self.tokens]
         self.state = TrackerState(self.num_tracks)
         self.track_start = [{'O': 'o', 'octave': '5'},
-                            {'V': 'v', 'volume_127': '85'},
+                            {'V': 'v', 'volume_127': '64'},
                             {'L': 'l', 'default_note_value': '4'},
                             # disabled because tempo should be sorted per channel beforehand.
                             # if future versions solve cross-tracks tempo changes, this could be enabled.
