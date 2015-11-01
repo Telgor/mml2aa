@@ -5,14 +5,14 @@ import argparse
 import sys
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-s", "--sync-rest-every", type=int,
-                    help="adds an r64 rest every nth event")
+parser.add_argument("-s", "--sync-rest-every", type=int, metavar='N',
+                    help="Adds an r64 rest every Nth event.")
 parser.add_argument("-v", "--verbosity", action="count", default=0,
-                    help="increase output verbosity")
+                    help="Increase output verbosity.")
 parser.add_argument('infile', nargs='?', type=argparse.FileType('r'),
-                    default=sys.stdin)
+                    default=sys.stdin, help="Input filename (default is stdin).")
 parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'),
-                    default=sys.stdout)
+                    default=sys.stdout, help="Output filename (default is stdout).")
 args = parser.parse_args()
 
 
