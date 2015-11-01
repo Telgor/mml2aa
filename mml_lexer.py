@@ -2,7 +2,9 @@ import re
 
 
 class Lexer(object):
-    def __init__(self):
+    def __init__(self, verbosity=False):
+        self.verbosity = verbosity
+
         # define a subset of the MML grammar that we want to support:
         # the convention here is Uppercase for mandatory fields, and lowercase of optional fields.
         dict_re_elements = {
@@ -25,7 +27,8 @@ class Lexer(object):
     def process(self, tracks):
         ret = []
         for (i, track) in enumerate(tracks):
-            print 'Track #' + str(i)
+            if self.verbosity:
+                print 'Track #' + str(i)
             ret += [self.process_tracks(track)]
         return ret
 
@@ -43,6 +46,7 @@ class Lexer(object):
             chars_matched_in_track = len(match_result.group(0))
             ret += [parsed_note]
             # debug print
-            print chars_matched_in_track, '@', position, ':', parsed_note
+            if self.verbosity:
+                print chars_matched_in_track, '@', position, ':', parsed_note
             position += chars_matched_in_track
         return ret

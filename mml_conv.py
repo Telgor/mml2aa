@@ -35,7 +35,9 @@ class TrackerState(object):
 
 
 class AAConverter(object):
-    def __init__(self, tokens):
+    def __init__(self, tokens, sync_rest_every_nth, verbosity=False):
+        self.sync_rest_every_nth = sync_rest_every_nth
+        self.verbosity = verbosity
         self.tokens = tokens
         self.num_tracks = len(tokens)
         self.event_counts = [len(i) for i in self.tokens]
@@ -57,8 +59,9 @@ class AAConverter(object):
             i = self.get_next_event_and_update_state(self.state)
             if not i:
                 break
-            print i
-            print self.state.measures
+            if self.verbosity:
+                print i
+                print self.state.measures
 
         return ret_str
 
@@ -129,7 +132,7 @@ class AAConverter(object):
             state.multipliers[i] = 1.5 if 'default_note_dot' in event else 1.
             state.default_note_values[i] = event['default_note_value']
 
-        self.new_tokens[i] += [event]
+        self.add_new_tokens(i, [event])
         state.positions[i] += 1
 
     def process_note_event(self, event, i):
@@ -143,11 +146,11 @@ class AAConverter(object):
             # before adding the note, insert an octave change
             note_octave = note_num // 12 + 1
             if current_octave != note_octave:
-                self.new_tokens[i] += [{'O': 'o', 'octave': str(note_octave)},
-                                       new_event,
-                                       {'O': 'o', 'octave': str(current_octave)}]
+                self.add_new_tokens(i, [{'O': 'o', 'octave': str(note_octave)},
+                                        new_event,
+                                        {'O': 'o', 'octave': str(current_octave)}])
             else:
-                self.new_tokens[i] += [new_event]
+                self.add_new_tokens(i, [new_event])
 
         elif 'R' in event:
             if 'rest_dot' in event:
@@ -161,12 +164,12 @@ class AAConverter(object):
 
                 secondary_value = str(int(primary_value) * 2)
                 new_secondary['rest_note_value'] = secondary_value
-                self.new_tokens[i] += [new_primary]
-                self.new_tokens[i] += [new_secondary]
+                self.add_new_tokens(i, [new_primary])
+                self.add_new_tokens(i, [new_secondary])
             else:
-                self.new_tokens[i] += [event]
+                self.add_new_tokens(i, [event])
         else:
-            self.new_tokens[i] += [event]
+            self.add_new_tokens(i, [event])
 
         state.positions[i] += 1
         state.measures[i] += self.get_event_note_value(event, state.default_note_values[i], state.multipliers[i])
@@ -247,3 +250,12 @@ class AAConverter(object):
         if 'num_note_dot' in event:
             new_event['note_dot'] = event['num_note_dot']
         return new_event
+
+    def add_new_tokens(self, i, event_list):
+        old_length = len(self.new_tokens[i])
+        self.new_tokens[i] += event_list
+        new_length = len(self.new_tokens[i])
+        # if we wrapped past the specified number of events, add 'r64' to workaround sync problem
+        if self.sync_rest_every_nth:
+            if old_length % self.sync_rest_every_nth > new_length % self.sync_rest_every_nth:
+                self.new_tokens[i] += [{'R': 'r', 'rest_note_value': '64'}]
