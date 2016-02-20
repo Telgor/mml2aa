@@ -4,6 +4,7 @@ https://www.reddit.com/r/archebards/comments/3bwgj7/howto_fix_archeagemml_desync
 """
 
 import sys
+from collections import deque
 
 
 def argmax(iterable):
@@ -32,6 +33,7 @@ class TrackerState(object):
         self.tempo = 120
         self.volumes = [8] * num_tracks
         self.active_tracks = num_tracks
+        self.event_queues = [deque() for _ in xrange(num_tracks)]
 
 
 class AAConverter(object):
@@ -49,7 +51,7 @@ class AAConverter(object):
                             # if future versions solve cross-tracks tempo changes, this could be enabled.
                             # {'T': 't', 'tempo': '120'}
                             ]
-        self.new_tokens = [[_j.copy() for _j in self.track_start] for _i in xrange(self.num_tracks)]
+        self.new_tokens = [[_j.copy() for _j in self.track_start] for _ in xrange(self.num_tracks)]
 
     def process(self):
         ret_str = ''
@@ -104,6 +106,7 @@ class AAConverter(object):
         return not ('Note' in event or 'R' in event or 'N' in event)
 
     def process_control_event(self, event, i):
+        add_event = True
         state = self.state
         assert self.is_control_event(event)
         if 'O' in event:
@@ -129,15 +132,31 @@ class AAConverter(object):
             event['volume'] = str(new_volume)
             event['volume_127'] = self.convert_volume(int(event['volume']))
         elif 'L' in event:
-            state.multipliers[i] = 1.5 if 'default_note_dot' in event else 1.
-            state.default_note_values[i] = event['default_note_value']
+            # save event to queue for delayed processing
+            current_queue = state.event_queues[i]
+            current_queue.append(event)
+            add_event = False
 
-        self.add_new_tokens(i, [event])
+        if add_event:
+            self.add_new_tokens(i, [event])
         state.positions[i] += 1
 
     def process_note_event(self, event, i):
         state = self.state
         assert not self.is_control_event(event)
+
+        if state.event_queues[i] and 'extend_note' not in event:
+            # consume next default note value
+            # for now we have only one type of event so we can pick the last one
+            # and ignore the rest.
+            last_value_event = state.event_queues[i].pop()
+            assert 'L' in last_value_event
+            state.multipliers[i] = 1.5 if 'default_note_dot' in last_value_event else 1.
+            state.default_note_values[i] = int(last_value_event['default_note_value'])
+            self.add_new_tokens(i, [last_value_event])
+            # clear the queue
+            state.event_queues[i].clear()
+
         # TODO: create multiple events for numbered notes and dotted rests.
         if 'N' in event:
             current_octave = int(state.octaves[i])
@@ -170,21 +189,36 @@ class AAConverter(object):
             else:
                 self.add_new_tokens(i, [event])
 
-        elif 'extend_note' in event and 'note_dot' in event:
-            # split extended dotted notes
-            new_primary = event.copy()
-            new_secondary = event.copy()
-            del new_primary['note_dot']
-            del new_secondary['note_dot']
-            if 'note_note_value' in new_primary:
-                primary_value = event['note_note_value']
-            else:
-                primary_value = state.default_note_values[i]
-            secondary_value = str(int(primary_value) * 2)
-            new_secondary['note_note_value'] = secondary_value
-            self.add_new_tokens(i, [new_primary])
-            self.add_new_tokens(i, [new_secondary])
+        elif 'extend_note' in event:
+            if 'note_dot' in event:
+                # split extended dotted notes
+                new_primary = event.copy()
+                new_secondary = event.copy()
+                del new_primary['note_dot']
+                del new_secondary['note_dot']
+                if 'note_note_value' in new_primary:
+                    primary_value = event['note_note_value']
+                else:
+                    primary_value = state.default_note_values[i]
+                    # always include note length for extended notes.
+                    new_primary['note_note_value'] = primary_value
 
+                secondary_value = str(int(primary_value) * 2)
+                new_secondary['note_note_value'] = secondary_value
+                self.add_new_tokens(i, [new_primary])
+                self.add_new_tokens(i, [new_secondary])
+            else:
+                # always include note length for extended notes.
+                if 'note_note_value' not in event:
+                    if state.event_queues[i]:
+                        # if the queue contains a new values, use it.
+                        event['note_note_value'] = state.event_queues[i][-1]['default_note_value']
+                    else:
+                        # else use the default value
+                        event['note_note_value'] = str(state.default_note_values[i])
+                self.add_new_tokens(i, [event])
+
+        # default case: just add the note
         else:
             self.add_new_tokens(i, [event])
 
