@@ -154,6 +154,7 @@ class AAConverter(object):
 
         elif 'R' in event:
             if 'rest_dot' in event:
+                # split extended dotted breaks
                 new_primary = {'R': 'r'}
                 new_secondary = {'R': 'r'}
                 if 'rest_note_value' in event:
@@ -168,6 +169,22 @@ class AAConverter(object):
                 self.add_new_tokens(i, [new_secondary])
             else:
                 self.add_new_tokens(i, [event])
+
+        elif 'extend_note' in event and 'note_dot' in event:
+            # split extended dotted notes
+            new_primary = event.copy()
+            new_secondary = event.copy()
+            del new_primary['note_dot']
+            del new_secondary['note_dot']
+            if 'note_note_value' in new_primary:
+                primary_value = event['note_note_value']
+            else:
+                primary_value = state.default_note_values[i]
+            secondary_value = str(int(primary_value) * 2)
+            new_secondary['note_note_value'] = secondary_value
+            self.add_new_tokens(i, [new_primary])
+            self.add_new_tokens(i, [new_secondary])
+
         else:
             self.add_new_tokens(i, [event])
 
