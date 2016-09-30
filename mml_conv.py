@@ -30,10 +30,11 @@ class TrackerState(object):
         self.default_note_values = [4] * num_tracks
         self.octaves = [5] * num_tracks
         self.time = [0] * num_tracks
+        self.time_ms = [0] * num_tracks
         self.tempo = 120
         self.volumes = [8] * num_tracks
         self.active_tracks = num_tracks
-        self.event_queues = [deque() for _ in xrange(num_tracks)]
+        self.event_queues = [deque() for _ in range(num_tracks)]
 
 
 class AAConverter(object):
@@ -51,7 +52,7 @@ class AAConverter(object):
                             # if future versions solve cross-tracks tempo changes, this could be enabled.
                             # {'T': 't', 'tempo': '120'}
                             ]
-        self.new_tokens = [[_j.copy() for _j in self.track_start] for _ in xrange(self.num_tracks)]
+        self.new_tokens = [[_j.copy() for _j in self.track_start] for _ in range(self.num_tracks)]
 
     def process(self):
         ret_str = ''
@@ -62,8 +63,8 @@ class AAConverter(object):
             if not i:
                 break
             if self.verbosity:
-                print i
-                print self.state.measures
+                print(i)
+                print(self.state.measures)
 
         return ret_str
 
@@ -91,10 +92,10 @@ class AAConverter(object):
         note_value = 0
         multiplier = 0
         if 'Note' in event:
-            multiplier = 1.5 if 'note_dot' in event else default_note_multiplier
+            multiplier = 1.5 if 'note_dot' in event else 1.0 if 'note_note_value' in event else default_note_multiplier
             note_value = event['note_note_value'] if 'note_note_value' in event else default_note_value
         elif 'R' in event:
-            multiplier = 1.5 if 'rest_dot' in event else default_note_multiplier
+            multiplier = 1.5 if 'rest_dot' in event else 1.0 if 'rest_note_value' in event else default_note_multiplier
             note_value = event['rest_note_value'] if 'rest_note_value' in event else default_note_value
         elif 'N' in event:
             multiplier = 1.5 if 'num_note_dot' in event else default_note_multiplier
@@ -125,7 +126,7 @@ class AAConverter(object):
             event['volume'] = str(state.volumes[i])
             event['volume_127'] = self.convert_volume(state.volumes[i])
         elif 'T' in event:
-            state.tempo = event['tempo']
+            state.tempo = int(event['tempo'])
         elif 'V' in event:
             new_volume = int(event['volume'])
             state.volumes[i] = new_volume
@@ -223,7 +224,6 @@ class AAConverter(object):
             self.add_new_tokens(i, [event])
 
         state.positions[i] += 1
-        state.measures[i] += self.get_event_note_value(event, state.default_note_values[i], state.multipliers[i])
 
     @staticmethod
     def convert_volume(volume):
@@ -303,10 +303,31 @@ class AAConverter(object):
         return new_event
 
     def add_new_tokens(self, i, event_list):
+        if False:
+            # track how much time is used by events
+            state = self.state
+            for event in event_list:
+                note_value = self.get_event_note_value(event, state.default_note_values[i], state.multipliers[i])
+                state.measures[i] += note_value / 4.
+                note_time = (60. / state.tempo) * note_value
+                # rounding scale in ms
+                scale = 0.3
+                # simulate AA's rounding error
+                note_time_ms = float(int(note_time * 1000 / scale)) * scale
+                state.time[i] += note_time
+                state.time_ms[i] += note_time_ms
+                pass
+
+            # if rounded time is delayed more than half of a sync pause, add a rest note
+            sync_time_ms = int(60. / state.tempo * (1./64.) * 1000)
+            if (state.time[i] * 1000) - state.time_ms[i] > sync_time_ms / 2.:
+                self.new_tokens[i] += [{'R': 'r', 'rest_note_value': '64'}]
+                state.time_ms[i] += sync_time_ms
+
         old_length = len(self.new_tokens[i])
         self.new_tokens[i] += event_list
-        new_length = len(self.new_tokens[i])
         # if we wrapped past the specified number of events, add 'r64' to workaround sync problem
         if self.sync_rest_every_nth:
+            new_length = len(self.new_tokens[i])
             if old_length % self.sync_rest_every_nth > new_length % self.sync_rest_every_nth:
                 self.new_tokens[i] += [{'R': 'r', 'rest_note_value': '64'}]

@@ -39,13 +39,13 @@ assert num_tracks <= 3
 char_limit = 200
 
 if args.verbosity:
-    print tracks
+    print(tracks)
 
 lexer = mml_lexer.Lexer()
 tokens = lexer.process(tracks)
 if args.verbosity:
-    print tokens
+    print(tokens)
 
 converter = mml_conv.AAConverter(tokens, sync_rest_every_nth=args.sync_rest_every, verbosity=args.verbosity)
 converter.process()
-print converter
+print(converter)

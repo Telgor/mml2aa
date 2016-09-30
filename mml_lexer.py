@@ -28,7 +28,7 @@ class Lexer(object):
         ret = []
         for (i, track) in enumerate(tracks):
             if self.verbosity:
-                print 'Track #' + str(i)
+                print('Track #' + str(i))
             ret += [self.process_tracks(track)]
         return ret
 
@@ -42,11 +42,11 @@ class Lexer(object):
 
             parsed_note = match_result.groupdict(default=None)
             # remove empty keys
-            parsed_note = dict((k, v) for k, v in parsed_note.iteritems() if v is not None)
+            parsed_note = dict((k, v) for k, v in parsed_note.items() if v is not None)
             chars_matched_in_track = len(match_result.group(0))
             ret += [parsed_note]
             # debug print
             if self.verbosity:
-                print chars_matched_in_track, '@', position, ':', parsed_note
+                print(chars_matched_in_track, '@', position, ':', parsed_note)
             position += chars_matched_in_track
         return ret
